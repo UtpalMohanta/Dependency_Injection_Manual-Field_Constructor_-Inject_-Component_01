@@ -134,10 +134,7 @@ class Driver @Inject constructor() {
 
 3️⃣ Car (Engine + Driver দরকার)
 import javax.inject.Inject
-class Car @Inject constructor(
-    private val engine: Engine,
-    private val driver: Driver
-) {
+class Car @Inject constructor( private val engine: Engine, private val driver: Driver) {
     fun drive(): String {
         return "${driver.getName()} is driving… ${engine.start()}"
     }
@@ -279,7 +276,7 @@ class NetworkModule {
             .build()
     }
 }
-এখানে Retrofit আমরা inject করতে পারলাম, কারণ constructor modify করতে পারিনি, তাই Provides method দিয়ে বানানোর নিয়ম দিয়েছি।
+এখানে Retrofit আমরা inject করতে পারলাম na, কারণ constructor modify করতে পারিনি, তাই Provides method দিয়ে বানানোর নিয়ম দিয়েছি।
 
 analogy 🍔
 তুমি chef (Dagger)
@@ -344,9 +341,7 @@ class LocalUserRepo @Inject constructor() : UserRepo {
     override fun getUser() = "User from Local DB"
 }
 Inject:
-class UserViewModel @Inject constructor(
-    private val repo: UserRepo
-) {
+class UserViewModel @Inject constructor( private val repo: UserRepo ) {
     fun showUser() = repo.getUser()
 }
 ⚠ Error:
@@ -357,9 +352,7 @@ Module:
 @Module
 interface RepoModule {
     @Binds
-    fun bindUserRepo(
-        impl: LocalUserRepo
-    ): UserRepo
+    fun bindUserRepo(impl: LocalUserRepo): UserRepo
 }
 👉 এটা মানে:
 “UserRepo চাইলে LocalUserRepo দেবে।”
@@ -594,3 +587,154 @@ Engine Started!
 
 Engine object Car create হওয়ার সময়ে বানানো হয়নি,
 startCar() ফাংশন কল করার সময় বানানো হয়েছে।
+
+🔵 Topic 1: What is Hilt?
+🔥 Hilt = Dependency Injection (DI) কে Android-এ খুব সহজ করে দেয়।
+Dagger কঠিন → অনেক কম্পোনেন্ট, মডিউল, boilerplate
+Hilt সহজ → Android lifecycle অনুযায়ী সব ready-made support
+
+⚡ Android app এ dependency inject করা খুব সহজ হয়:
+Activity/Fragment/Service → কয়েকটা annotation দিলেই dependency চলে আসে
+ViewModel inject করা super easy
+Retrofit/Room/Repository সব inject করা সহজ
+
+✔️ With Hilt (auto injection)
+Step 1: App class
+@HiltAndroidApp
+class MyApp : Application()
+
+Step 2: Activity inject
+@AndroidEntryPoint
+class MainActivity : AppCompatActivity() {
+    @Inject
+    lateinit var car: Car
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        println(car.drive())
+    }
+}
+Step 3: Dependency classes
+class Engine @Inject constructor() {
+    fun start() = "Engine started"
+}
+class Car @Inject constructor(private val engine: Engine) {
+    fun drive() = engine.start()
+}
+🔥 @HiltAndroidApp কী?
+এটা এমন একটি annotation যেটা Application ক্লাসে দিলে Hilt পুরো অ্যাপে নিজের জন্য
+DI container তৈরি করে
+1.Component গুলো বানায়
+2.Dependency graph setup করে
+👉 সহজ ভাষায়:
+“Hilt কে বলি — এই অ্যাপে কাজ শুরু করো।”
+
+🟢 কেন এটা লাগে?
+Android app শুরু হয় Application class থেকে।
+তাই Hilt চায়:
+"আমাকে আগে Application ক্লাসে ঢুকতে দাও, তারপর আমি পুরো অ্যাপে dependency inject করবো।"
+
+🟣 Example 
+Step 1: Application class তৈরি করো
+@HiltAndroidApp
+class MyApp : Application()
+👉 শুধু এই এক লাইন দিলে Hilt backend-এ নিজের জন্য Component বানিয়ে প্রস্তুত হয়ে যায়।
+
+🟡 যদি এটা না দাও?
+❌ Hilt কাজ করবে না
+❌ কোন Activity/Fragment এ injection পাওয়া যাবে না
+❌ @Inject, @Module সবই error দিবে
+
+🔥 Real Life Example (প্রকৃত প্রজেক্টে)
+যখন তুমি Retrofit, Room, Repository inject করতে চাও, Hilt আগে Application এ rooted না হলে এগুলো app-wide কাজ করবে না।
+📝 Summary 
+@HiltAndroidApp দিলে Hilt পুরো অ্যাপের জন্য DI container বানায়।
+
+🔵 Topic 3: @AndroidEntryPoint
+(Activity/Fragment এ dependency ঢোকানোর দরজা)
+🔥 @AndroidEntryPoint কী?
+এই annotation দিলে Hilt ওই Activity/Fragment/Service/Receiver এর ভিতরে dependency inject করতে পারে।
+👉 সহজ ভাষায়:
+“Hilt, এটার ভিতরে dependency পাঠাতে পারো।”
+
+🟢 কেন লাগে?
+তুমি যদি Activity বা Fragment–এ @Inject ব্যবহার করতে চাও, তাহলে অবশ্যই @AndroidEntryPoint দিতে হবে।
+না দিলে error → “Hilt cannot inject this class”
+🔥 কোন জায়গায় @AndroidEntryPoint লাগে?
+Activity, Fragment, View, Service, BroadcastReceiver, Fragment inside Fragment, Hilt-enabled ViewModels
+
+👉 Basically যেখানে @Inject variable লাগে, সেখানে এই annotation দেওয়া লাগে।
+❌ কোথায় লাগে না?
+সাধারণ class, Repository, UseCase, Utils, Retrofit service, Room DAO
+এগুলোতে শুধু constructor-এ @Inject দিলেই হয়।
+
+🔵 Topic 4: @Inject (Constructor Injection)
+(Dependency ইনজেক্ট করার সবচেয়ে সহজ, সুন্দর এবং powerful পদ্ধতি)
+
+🔥 @Inject কী?
+👉 এটা এমন একটি annotation যেটা দিলে Hilt বুঝে যায়:
+“এই ক্লাসটা বানাতে হলে এর ভিতরের dependency গুলো আমিই তৈরি করবো।”
+মানে object manually নতুন করে বানাতে হবে না।
+🟢 কেন এটা লাগে?
+Constructor Injection = Hilt class-এর object তৈরি করে
+→ constructor-এ যেটা লাগবে সেটা automatic দেয়।
+
+🔵 Topic 5: Hilt Components (Scopes + Lifetime সহজভাবে)
+এই টপিকটা খুব গুরুত্বপূর্ণ, কারণ dependency কতক্ষণ বাঁচবে (lifetime) সেটা Component ঠিক করে।
+🔥 Hilt Components কী?
+Hilt-এ কিছু predefined components আছে।
+প্রতিটি component Android lifecycle অনুযায়ী dependency ধরে রাখে।
+
+👉 সহজ ভাষায়:
+“App-এর কোন লেভেলে কোন dependency কতক্ষণ থাকবে— এটা component ঠিক করে।”
+🟢 Hilt-এর Built-In Components (সহজ ব্যাখ্যা)
+Component	                 Lifetime	            কোথায় ব্যবহার
+SingletonComponent	পুরো অ্যাপ চলা পর্যন্ত	Retrofit, Room, Repository, prefManager
+ActivityRetainedComponent	Activity destroy → recreate হলেও থাকে	ViewModel
+ActivityComponent	Activity destroy হওয়া পর্যন্ত	Activity-specific dependency
+FragmentComponent	Fragment destroy হওয়া পর্যন্ত	Fragment dependency
+ViewModelComponent	ViewModel এর lifetime	UseCase, Repository inside ViewModel
+ViewComponent	View destroy হওয়া পর্যন্ত	Custom View
+ServiceComponent	Service stop হওয়া পর্যন্ত	Foreground Service dependency
+
+🟣 Super Simple Example — SingletonComponent
+Repository সারা অ্যাপে একটাই থাকবে
+@Module
+@InstallIn(SingletonComponent::class)
+object RepoModule {
+    @Provides
+    @Singleton
+    fun provideRepository(): UserRepository {
+        return UserRepository()
+    }
+}
+👉 এই object অ্যাপ বন্ধ না হওয়া পর্যন্ত বেঁচে থাকবে।
+
+🔵 Topic 6: @Module + @InstallIn
+(যেখানে @Inject constructor ব্যবহার করা যায় না—সেখানে dependency Provide করার সিস্টেম)
+🔥 @Module কী?
+👉 সহজ ভাষায়:
+Module = Dependency বানানোর কারখানা।
+যে dependency constructor-এ @Inject দিতে পারো না → সেটা Module এর ভিতরে বানাতে হয়।
+🔥 @InstallIn কী?
+Module কোথায় install হবে → কোন Component এর under এ dependency থাকবে → সেটা বলে দেয়।
+👉 সহজ ভাষায়:
+InstallIn = Dependency কতক্ষণ বাঁচবে সেটা ঠিক করা।
+🟣 কখন Module লাগে? (Important)
+Constructor এ @Inject দেওয়া যায় না যখন:
+❌ third-party class, ❌ Retrofit, ❌ Room database, ❌ OkHttp, ❌ SharedPreferences, ❌ Firebase, ❌ Interfaces → Implementation, ❌ Custom builder class
+এসবের object Hilt নিজে জানে না, তাই Module দিয়ে বানানোর rule দিতে হয়।
+🟢 Example 1 — Retrofit Provide করা
+@Module
+@InstallIn(SingletonComponent::class)
+object NetworkModule {
+    @Provides
+    @Singleton
+    fun provideRetrofit(): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl("https://api.example.com/")
+            .build()
+    }
+}
+✔ Retrofit @Inject constructor নেই
+✔ তাই @Provides দিয়ে object বানাচ্ছি
+✔ SingletonComponent → Retrofit পুরো অ্যাপে একটাই থাকবে
