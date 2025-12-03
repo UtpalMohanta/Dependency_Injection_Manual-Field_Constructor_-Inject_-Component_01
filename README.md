@@ -794,4 +794,4 @@ File Log: Hello Hilt!
 ✔ abstract function হতে হবে
 ✔ Module class → abstract class হতে হবে
 ✔ Argument = implementation
-✔ Return type = interface
+✔ Return type = interface.
