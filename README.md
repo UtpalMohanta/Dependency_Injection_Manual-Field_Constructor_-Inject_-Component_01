@@ -738,3 +738,60 @@ object NetworkModule {
 ✔ Retrofit @Inject constructor নেই
 ✔ তাই @Provides দিয়ে object বানাচ্ছি
 ✔ SingletonComponent → Retrofit পুরো অ্যাপে একটাই থাকবে
+
+🔵 Topic 7: @Binds — Interface → Implementation Inject করা
+(Hilt-এ Interface এর জন্য dependency bind করার সবচেয়ে সহজ পদ্ধতি)
+🔥 @Binds কী?
+👉 এটা এমন একটা annotation যেটা Hilt-কে বলে:
+“এই Interface চাইলে এই Implementation দিও।”
+মানে:
+Interface → কোন ক্লাস ব্যবহার হবে সেটা fix করা।
+🟣 কেন এটা লাগে?
+Android-এ Interface বেশি use করা হয়:
+Clean Architecture
+Repository Pattern
+UseCase
+Abstraction
+Testing easy করার জন্য
+কিন্তু Hilt Interface এর object বানাতে পারে না, কারণ Interface-এর constructor নেই।
+তাই Hilt কে বলতে হয়—
+“এই Interface-এর implementation হলো এই ক্লাস।”
+🟢 Simple Example (Super Easy)
+Step 1: Interface
+interface Logger {
+    fun log(message: String)
+}
+Step 2: Implementation class
+class FileLogger @Inject constructor() : Logger {
+    override fun log(message: String) {
+        println("File Log: $message")
+    }
+}
+Step 3: Binds Module
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class LoggerModule {
+    @Binds
+    abstract fun bindLogger(impl: FileLogger): Logger
+}
+👉 বলছে:
+যখনই Logger প্রয়োজন হবে → Hilt automatically FileLogger দেবে।
+
+🔵 Activity তে use করা
+@AndroidEntryPoint
+class MainActivity : AppCompatActivity() {
+    @Inject
+    lateinit var logger: Logger
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        logger.log("Hello Hilt!")
+    }
+}
+Output:
+File Log: Hello Hilt!
+
+🟡 @Binds এর Rules
+✔ abstract function হতে হবে
+✔ Module class → abstract class হতে হবে
+✔ Argument = implementation
+✔ Return type = interface
